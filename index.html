@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Costes 3D</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* --- ESTILOS DE LA WEB (Diseño acordeones tipo imagen) --- */
+        :root {
+            --bg: #f8f9fa;
+            --border: #e9ecef;
+            --primary: #0f172a;
+            /* Negro/Azul oscuro */
+            --accent: #e91e63;
+            /* Rosa para botones extra */
+            --text: #343a40;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Banner de precio flotante */
+        .price-banner {
+            background: white;
+            padding: 15px 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            margin-bottom: 20px;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .price-text {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        /* Estilo de los Pasos (Acordeones) */
+        .step-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .step-header {
+            background: #fff;
+            padding: 15px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid transparent;
+            user-select: none;
+        }
+
+        .step-header:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* Flecha animada */
+        .step-header::after {
+            content: '▼';
+            font-size: 0.7em;
+            color: #adb5bd;
+            transition: transform 0.3s;
+        }
+
+        /* Estado colapsado */
+        .step-card.collapsed .step-body {
+            display: none;
+        }
+
+        .step-card.collapsed .step-header::after {
+            transform: rotate(-90deg);
+        }
+
+        .step-card:not(.collapsed) .step-header {
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .step-body {
+            padding: 25px;
+        }
+
+        /* Grids para inputs */
+        .row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        input,
+        select {
+            padding: 10px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            width: 100%;
+            box-sizing: border-box;
+            /* Vital para que no se desborde */
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
+        }
+
+        .help-text {
+            font-size: 0.75rem;
+            color: #868e96;
+            margin-top: -4px;
+        }
+
+        .check-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .check-group input {
+            width: auto;
+        }
+
+        /* Botones */
+        .actions {
+            margin-top: 30px;
+            display: flex;
+            gap: 15px;
+            padding-bottom: 50px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            font-size: 0.9rem;
+        }
+
+        .btn-calc {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-pdf {
+            background: #000;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        /* --- ESTILOS DEL PDF (ESTRICTOS PARA QUE NO SE CORTE) --- */
+        /* Contenedor posicionado fuera de la vista pero con dimensiones físicas reales */
+        #pdf-container {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+        }
+
+        /* DIMENSIONES CLAVE:
+           A4 width es aprox 210mm. 
+           Si usamos pixels, ~750px - 800px es seguro para escalar a A4.
+           ESTO EVITA EL CORTE.
+        */
+        #invoice-template {
+            width: 750px;
+            background: white;
+            padding: 50px;
+            box-sizing: border-box;
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #000;
+        }
+
+        .pdf-title {
+            font-size: 26px;
+            font-weight: 800;
+            text-transform: uppercase;
+            border-bottom: 3px solid #000;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
+        }
+
+        .pdf-meta p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 40px;
+        }
+
+        .pdf-table th {
+            text-align: left;
+            background-color: #f1f1f1;
+            padding: 12px 15px;
+            font-weight: 700;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .pdf-table td {
+            padding: 15px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .total-row td {
+            background-color: #fcfcfc;
+            font-size: 18px;
+            font-weight: 800;
+            border-top: 2px solid #000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-container">
+        <h2 style="color: var(--primary);">Calculadora de costes de impresión 3D</h2>
+
+        <div class="price-banner">
+            <span>Coste total:</span>
+            <span class="price-text" id="display-total">0.00 €</span>
+        </div>
+
+        <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">Paso 1: Información del Proyecto</div>
+            <div class="step-body">
+                <div class="row">
+                    <div class="col">
+                        <label>Cliente</label>
+                        <input type="text" id="clientName" value="Yeray Iglesias">
+                    </div>
+                    <div class="col">
+                        <label>Proyecto / Pieza</label>
+                        <input type="text" id="projectName" value="Tapa Bmw e46">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label>Tiempo (Horas)</label>
+                        <input type="number" id="h" value="2" placeholder="0">
+                    </div>
+                    <div class="col">
+                        <label>Minutos</label>
+                        <input type="number" id="m" value="0" placeholder="0">
+                    </div>
+                    <div class="col">
+                        <label>Filamento usado (g)</label>
+                        <input type="number" id="weight" value="42">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">Paso 2: Filamento</div>
+            <div class="step-body">
+                <div class="row">
+                    <div class="col">
+                        <label>Precio Bobina (€)</label>
+                        <input type="number" id="fPrice" value="20">
+                    </div>
+                    <div class="col">
+                        <label>Peso Bobina (g)</label>
+                        <input type="number" id="fWeight" value="1000">
+                    </div>
+                    <div class="col">
+                        <label>Desperdicio / Merma (%)</label>
+                        <input type="number" id="waste" value="8">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <label>Material</label>
+                        <select id="materialType">
+                            <option>PLA</option>
+                            <option>PETG</option>
+                            <option selected>ABS</option>
+                            <option>TPU</option>
+                            <option>ASA</option>
+                            <option>Resina</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label>Diámetro</label>
+                        <select>
+                            <option>1.75 mm</option>
+                            <option>2.85 mm</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card collapsed">
+            <div class="step-header" onclick="toggleStep(this)">Paso 3: Electricidad</div>
+            <div class="step-body">
+                <div class="check-group">
+                    <input type="checkbox" id="useElec"> <label for="useElec" style="margin:0; cursor:pointer;">Incluir
+                        coste eléctrico</label>
+                </div>
+                <div class="row">
+                    <div class="col"><label>Consumo (W)</label><input type="number" id="watt" value="150"></div>
+                    <div class="col"><label>Precio luz (€/kWh)</label><input type="number" id="kwhPrice" value="0.22">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card collapsed">
+            <div class="step-header" onclick="toggleStep(this)">Paso 4: Mano de obra</div>
+            <div class="step-body">
+                <div class="check-group">
+                    <input type="checkbox" id="useLabor"> <label for="useLabor"
+                        style="margin:0; cursor:pointer;">Incluir mano de obra</label>
+                </div>
+                <div class="row">
+                    <div class="col"><label>Tiempo dedicación (min)</label><input type="number" id="prepMin" value="15">
+                    </div>
+                    <div class="col"><label>Precio hora (€/h)</label><input type="number" id="laborPrice" value="15">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card collapsed">
+            <div class="step-header" onclick="toggleStep(this)">Paso 5: Amortización</div>
+            <div class="step-body">
+                <div class="check-group">
+                    <input type="checkbox" id="useAmort"> <label for="useAmort"
+                        style="margin:0; cursor:pointer;">Incluir amortización máquina</label>
+                </div>
+                <div class="row">
+                    <div class="col"><label>Coste impresora (€)</label><input type="number" id="printerCost"
+                            value="300"></div>
+                    <div class="col"><label>Meses amortización</label><input type="number" id="amortMonths" value="12">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">Paso 7: Margen de beneficio</div>
+            <div class="step-body">
+                <div class="col" style="max-width: 200px;">
+                    <label>Margen (%)</label>
+                    <input type="number" id="profit" value="30">
+                </div>
+
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-calc" onclick="calculate()">Calcular</button>
+            <button class="btn btn-pdf" onclick="generatePDF()"> Descargar PDF</button>
+        </div>
+    </div>
+
+    <div id="pdf-container">
+        <div id="invoice-template">
+            <div class="pdf-title">FACTURA DE TRABAJO 3D</div>
+
+            <div class="pdf-meta">
+                <p><strong>Cliente:</strong> <span id="pdf-client"></span></p>
+                <p><strong>Proyecto:</strong> <span id="pdf-project"></span></p>
+                <p><strong>Fecha:</strong> <span id="pdf-date"></span></p>
+            </div>
+
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70%;">Concepto / Material</th>
+                        <th style="width: 30%; text-align: right;">Coste</th>
+                    </tr>
+                </thead>
+                <tbody id="pdf-rows">
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td>PRECIO FINAL</td>
+                        <td style="text-align: right;" id="pdf-total"></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+        </div>
+    </div>
+
+    <script>
+        // Lógica de acordeones
+        function toggleStep(headerElement) {
+            headerElement.parentElement.classList.toggle('collapsed');
+        }
+
+        // Lógica de Cálculo
+        function calculate() {
+            // Datos básicos
+            const h = parseFloat(document.getElementById('h').value) || 0;
+            const m = parseFloat(document.getElementById('m').value) || 0;
+            const time = h + (m / 60);
+            const weight = parseFloat(document.getElementById('weight').value) || 0;
+
+            // Material
+            const fPrice = parseFloat(document.getElementById('fPrice').value) || 0;
+            const fWeight = parseFloat(document.getElementById('fWeight').value) || 1000;
+            const waste = parseFloat(document.getElementById('waste').value) || 0;
+
+            const matSelect = document.getElementById('materialType');
+            const matName = matSelect.options[matSelect.selectedIndex].text;
+
+            // Coste Base Material
+            const matCost = ((weight * (1 + waste / 100)) * fPrice) / fWeight;
+
+            // Extras
+            let extras = 0;
+
+            // Luz
+            if (document.getElementById('useElec').checked) {
+                extras += (parseFloat(document.getElementById('watt').value) / 1000) * time * parseFloat(document.getElementById('kwhPrice').value);
+            }
+
+            // Mano de Obra
+            if (document.getElementById('useLabor').checked) {
+                extras += (parseFloat(document.getElementById('prepMin').value) / 60) * parseFloat(document.getElementById('laborPrice').value);
+            }
+
+            // Amortización (Estimación 300h/mes)
+            if (document.getElementById('useAmort').checked) {
+                const pCost = parseFloat(document.getElementById('printerCost').value);
+                const months = parseFloat(document.getElementById('amortMonths').value);
+                extras += (pCost / (months * 300)) * time;
+            }
+
+            const profit = parseFloat(document.getElementById('profit').value) || 0;
+            const total = (matCost + extras) * (1 + profit / 100);
+
+            // Actualizar banner web
+            document.getElementById('display-total').innerText = total.toFixed(2) + " €";
+
+            // Devolver datos estructurados
+            return {
+                client: document.getElementById('clientName').value,
+                project: document.getElementById('projectName').value,
+                matName: matName,
+                weight: weight,
+                cMat: matCost.toFixed(2),
+                cExtras: extras.toFixed(2),
+                total: total.toFixed(2),
+                hasExtras: extras > 0.01
+            };
+        }
+
+        // Generar PDF
+        function generatePDF() {
+            const data = calculate();
+
+            // 1. Rellenar datos en el template oculto
+            document.getElementById('pdf-client').innerText = data.client;
+            document.getElementById('pdf-project').innerText = data.project;
+            document.getElementById('pdf-date').innerText = new Date().toLocaleDateString();
+            document.getElementById('pdf-total').innerText = data.total + " €";
+
+            // 2. Construir filas de la tabla
+            let htmlRows = `
+            <tr>
+                <td>
+                    <strong>Material seleccionado: ${data.matName}</strong><br>
+                    <span style="color: #666; font-size: 13px;">Peso de la pieza: ${data.weight}g</span>
+                </td>
+                <td style="text-align: right;">${data.cMat} €</td>
+            </tr>
+        `;
+
+            if (data.hasExtras) {
+                htmlRows += `
+            <tr>
+                <td>
+                    <strong>Gastos Operativos</strong><br>
+                    <span style="color: #666; font-size: 13px;">Energía, preparación y/o amortización</span>
+                </td>
+                <td style="text-align: right;">${data.cExtras} €</td>
+            </tr>
+            `;
+            }
+
+            document.getElementById('pdf-rows').innerHTML = htmlRows;
+
+            // 3. Configuración CLAVE para evitar cortes
+            const element = document.getElementById('invoice-template');
+            const opt = {
+                margin: 10, // Margen blanco alrededor del papel
+                filename: `Presupuesto_${data.project.replace(/\s+/g, '_')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2, // Alta resolución
+                    useCORS: true,
+                    scrollY: 0
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // 4. Generar
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+
+</body>
+
+</html>
